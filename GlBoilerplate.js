@@ -37,13 +37,14 @@ function compileShader(gl, shaderSource, shaderType) {
  * @param {!WebGLShader} fragmentShader A fragment shader.
  * @return {!WebGLProgram} A program.
  */
-function createProgram(gl, vertexShader, fragmentShader) {
+function createProgram(gl, shaders) {
   // create a program.
   var program = gl.createProgram();
 
   // attach the shaders.
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
+  shaders.forEach( shader => {
+    gl.attachShader(program, shader);
+  })
 
   // link the program.
   gl.linkProgram(program);
@@ -78,8 +79,6 @@ function createShaderFromScript(gl, scriptId, opt_shaderType) {
   // extract the contents of the script tag.
   var shaderSource = shaderScript.text;
 
-  console.log(`createShaderFromScript: shaderSource=${shaderSource}` );
-
   // If we didn't pass in a type, use the 'type' from
   // the script tag.
   if (!opt_shaderType) {
@@ -103,30 +102,36 @@ function createShaderFromScript(gl, scriptId, opt_shaderType) {
  * @param {string} fragmentShaderId The id of the fragment shader script tag.
  * @return {!WebGLProgram} A program
  */
-function createProgramFromScripts(
-    gl, vertexShaderId, fragmentShaderId) {
-  var vertexShader = createShaderFromScript(gl, vertexShaderId);
-  var fragmentShader = createShaderFromScript(gl, fragmentShaderId);
-  return createProgram(gl, vertexShader, fragmentShader);
+function createProgramFromScripts( gl, ids) {
+  const shaders = ids.map( id => { return createShaderFromScript(gl, id); });
+  return createProgram(gl, shaders);
 }
 
+/**
+ * fetches the glsl fragment based on its id, adds it as a new script element.
+ *
+ * @param {!document} doc Where to inject the new script elements.
+ * @param {string} id The id of the shader script tag (filename and type are derived from it).
+ * @return {!promise} A promise from the fetch
+ */
 function fetchGlslFragment(doc, id){
   console.log(`fetchGlslFragment: start: id=${id}`);
   if (! id.match(/(vertex|fragment)/)) {
-    throw "fetchGlslFragment: id does not mention vertex or fragment: ${id}";
+    throw `ERROR: fetchGlslFragment: id does not mention vertex or fragment: ${id}`;
   }
   var type = (id.match('vertex'))? 'x-shader/x-vertex' : 'x-shader/x-fragment';
   const filename = `glsl/${id}.glsl`;
-  
+
   return fetch( filename )
   .then( response => { return response.text(); })
   .then( text => {
-    console.log(`fetchGlslProgram: fetched text=${text}`);
+    console.log(`fetchGlslProgram: fetched id=${id}`);
     var script = document.createElement('script');
     script.type      = type;
     script.innerHTML = text;
     script.id        = id;
     (doc.getElementsByTagName( "head" )[ 0 ]).appendChild( script );
+    console.log(`fetchGlslProgram: injected id=${id}`);
   })
   ;
 }

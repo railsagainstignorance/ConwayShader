@@ -45,20 +45,19 @@ function initGL() {
     // fetch all the program fragments,
     // inject them into script elements with appropriate ids
     // then look them up using script ids and compile the overall program.
-    const fragments = ['2d-vertex-shader', '2d-fragment-shader'];
+    const fragmentIds = ['2d-vertex-shader', '2d-fragment-shader'];
+    console.log(`initGL: fragmentIds=${fragmentIds}`);
 
-    const fragmentPromises = fragments.map( f => {
+    const fragmentPromises = fragmentIds.map( f => {
       return fetchGlslFragment( document, f );
     })
 
     Promise.all( fragmentPromises )
     .then( () => {
-      var program = createProgramFromScripts(gl, "2d-vertex-shader", "2d-fragment-shader");
-      console.log('initGL: have just createProgramFromScripts in promise');
-      return program;
+      console.log('initGL: all fragments fetched');
+      return createProgramFromScripts(gl, fragmentIds);
     })
     .then( program => {
-      // var program = createProgramFromScripts(gl, "2d-vertex-shader", "2d-fragment-shader");
       gl.useProgram(program);
 
       // look up where the vertex data needs to go.
