@@ -42,64 +42,81 @@ function initGL() {
 
     gl.disable(gl.DEPTH_TEST);
 
-    // setup a GLSL program
-    var program = createProgramFromScripts(gl, "2d-vertex-shader", "2d-fragment-shader");
-    gl.useProgram(program);
+    // fetch all the program fragments,
+    // inject them into script elements with appropriate ids
+    // then look them up using script ids and compile the overall program.
+    const fragments = ['2d-vertex-shader', '2d-fragment-shader'];
 
-    // look up where the vertex data needs to go.
-    var positionLocation = gl.getAttribLocation(program, "a_position");
+    const fragmentPromises = fragments.map( f => {
+      return fetchGlslFragment( document, f );
+    })
 
-    // Create a buffer for positions
-    var bufferPos = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, bufferPos);
-    gl.enableVertexAttribArray(positionLocation);
-    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+    Promise.all( fragmentPromises )
+    .then( () => {
+      var program = createProgramFromScripts(gl, "2d-vertex-shader", "2d-fragment-shader");
+      console.log('initGL: have just createProgramFromScripts in promise');
+      return program;
+    })
+    .then( program => {
+      // var program = createProgramFromScripts(gl, "2d-vertex-shader", "2d-fragment-shader");
+      gl.useProgram(program);
 
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        -1.0, -1.0,
-        1.0, -1.0,
-        -1.0, 1.0,
-        -1.0, 1.0,
-        1.0, -1.0,
-        1.0, 1.0]), gl.STATIC_DRAW);
+      // look up where the vertex data needs to go.
+      var positionLocation = gl.getAttribLocation(program, "a_position");
 
+      // Create a buffer for positions
+      var bufferPos = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufferPos);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-    //flip y
-    flipYLocation = gl.getUniformLocation(program, "u_flipY");
-
-    //set texture location
-    var texCoordLocation = gl.getAttribLocation(program, "a_texCoord");
-
-    textureSizeLocation = gl.getUniformLocation(program, "u_textureSize");
-
-    mouseCoordLocation = gl.getUniformLocation(program, "u_mouseCoord");
-
-    // provide texture coordinates for the rectangle.
-    var texCoordBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        0.0, 0.0,
-        1.0, 0.0,
-        0.0, 1.0,
-        0.0, 1.0,
-        1.0, 0.0,
-        1.0, 1.0]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(texCoordLocation);
-    gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+          -1.0, -1.0,
+          1.0, -1.0,
+          -1.0, 1.0,
+          -1.0, 1.0,
+          1.0, -1.0,
+          1.0, 1.0]), gl.STATIC_DRAW);
 
 
-    onResize();
+      //flip y
+      flipYLocation = gl.getUniformLocation(program, "u_flipY");
 
-    lastState = resizedLastState;
-    currentState = resizedCurrentState;
-    resizedLastState = null;
-    resizedCurrentState = null;
+      //set texture location
+      var texCoordLocation = gl.getAttribLocation(program, "a_texCoord");
 
-    frameBuffer = gl.createFramebuffer();
+      textureSizeLocation = gl.getUniformLocation(program, "u_textureSize");
 
-    gl.bindTexture(gl.TEXTURE_2D, lastState);//original texture
+      mouseCoordLocation = gl.getUniformLocation(program, "u_mouseCoord");
 
-    render();
+      // provide texture coordinates for the rectangle.
+      var texCoordBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+          0.0, 0.0,
+          1.0, 0.0,
+          0.0, 1.0,
+          0.0, 1.0,
+          1.0, 0.0,
+          1.0, 1.0]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(texCoordLocation);
+      gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+
+      onResize();
+
+      lastState = resizedLastState;
+      currentState = resizedCurrentState;
+      resizedLastState = null;
+      resizedCurrentState = null;
+
+      frameBuffer = gl.createFramebuffer();
+
+      gl.bindTexture(gl.TEXTURE_2D, lastState);//original texture
+
+      render();
+    })
+    ;
 }
 
 function makeRandomArray(rgba){

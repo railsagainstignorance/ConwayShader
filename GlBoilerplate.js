@@ -78,6 +78,8 @@ function createShaderFromScript(gl, scriptId, opt_shaderType) {
   // extract the contents of the script tag.
   var shaderSource = shaderScript.text;
 
+  console.log(`createShaderFromScript: shaderSource=${shaderSource}` );
+
   // If we didn't pass in a type, use the 'type' from
   // the script tag.
   if (!opt_shaderType) {
@@ -106,4 +108,21 @@ function createProgramFromScripts(
   var vertexShader = createShaderFromScript(gl, vertexShaderId);
   var fragmentShader = createShaderFromScript(gl, fragmentShaderId);
   return createProgram(gl, vertexShader, fragmentShader);
+}
+
+function fetchGlslFragment(doc, id){
+  console.log(`fetchGlslFragment: start: id=${id}`);
+  var type = (id.match('vertex'))? 'x-shader/x-vertex' : 'x-shader/x-fragment';
+  const filename = `glsl/${id}.glsl`;
+  return fetch( filename )
+  .then( response => { return response.text(); })
+  .then( text => {
+    console.log(`fetchGlslProgram: fetched text=${text}`);
+    var script = document.createElement('script');
+    script.type      = type;
+    script.innerHTML = text;
+    script.id        = id;
+    (doc.getElementsByTagName( "head" )[ 0 ]).appendChild( script );
+  })
+  ;
 }
