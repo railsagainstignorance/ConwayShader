@@ -60,84 +60,7 @@ function createProgram(gl, shaders) {
 }
 
 /**
- * Creates a shader from the content of a script tag.
- *
- * @param {!WebGLRenderingContext} gl The WebGL Context.
- * @param {string} scriptId The id of the script tag.
- * @param {string} opt_shaderType. The type of shader to create.
- *     If not passed in will use the type attribute from the
- *     script tag.
- * @return {!WebGLShader} A shader.
- */
-function createShaderFromScript(gl, scriptId, opt_shaderType) {
-  // look up the script tag by id.
-  var shaderScript = document.getElementById(scriptId);
-  if (!shaderScript) {
-    throw("*** Error: unknown script element" + scriptId);
-  }
-
-  // extract the contents of the script tag.
-  var shaderSource = shaderScript.text;
-
-  // If we didn't pass in a type, use the 'type' from
-  // the script tag.
-  if (!opt_shaderType) {
-    if (shaderScript.type == "x-shader/x-vertex") {
-      opt_shaderType = gl.VERTEX_SHADER;
-    } else if (shaderScript.type == "x-shader/x-fragment") {
-      opt_shaderType = gl.FRAGMENT_SHADER;
-    } else if (!opt_shaderType) {
-      throw("*** Error: shader type not set");
-    }
-  }
-
-  return compileShader(gl, shaderSource, opt_shaderType);
-}
-
-/**
- * Creates a program from 2 script tags.
- *
- * @param {!WebGLRenderingContext} gl The WebGL Context.
- * @param {string} vertexShaderId The id of the vertex shader script tag.
- * @param {string} fragmentShaderId The id of the fragment shader script tag.
- * @return {!WebGLProgram} A program
- */
-function createProgramFromScripts( gl, ids) {
-  const shaders = ids.map( id => { return createShaderFromScript(gl, id); });
-  return createProgram(gl, shaders);
-}
-
-/**
- * fetches the glsl fragment based on its id, adds it as a new script element.
- *
- * @param {!document} doc Where to inject the new script elements.
- * @param {string} id The id of the shader script tag (filename and type are derived from it).
- * @return {!promise} A promise from the fetch
- */
-function fetchGlslFragment( id){
-  console.log(`fetchGlslFragment: start: id=${id}`);
-  if (! id.match(/(vertex|fragment)/)) {
-    throw `ERROR: fetchGlslFragment: id does not mention vertex or fragment: ${id}`;
-  }
-  var type = (id.match('vertex'))? 'x-shader/x-vertex' : 'x-shader/x-fragment';
-  const filename = `glsl/${id}.glsl`;
-
-  return fetch( filename )
-  .then( response => { return response.text(); })
-  .then( text => {
-    console.log(`fetchGlslProgram: fetched id=${id}`);
-    var script = document.createElement('script');
-    script.type      = type;
-    script.innerHTML = text;
-    script.id        = id;
-    (document.getElementsByTagName( "head" )[ 0 ]).appendChild( script );
-    console.log(`fetchGlslProgram: injected id=${id}`);
-  })
-  ;
-}
-
-/**
- * Creates a program from a list of ids.
+ * Creates a program from a list of fragment ids, where the fragments are text files.
  *
  * @param {!WebGLRenderingContext} gl The WebGL Context.
  * @param {array} ids The list of shader ids.
@@ -146,14 +69,33 @@ function fetchGlslFragment( id){
 function fetchFragmentsAndCreateProgram( gl, ids ) {
   console.log(`fetchFragmentsAndCreateProgram: ids=${ids}`);
 
-  const fragmentPromises = ids.map( id => {
-    return fetchGlslFragment( id );
-  })
+  // for each id
+  // - fetch the assumed fragment file
+  // - construct a shader from the text
+  // when all shaders are created
+  // - create the combined program
 
-  return Promise.all( fragmentPromises )
-  .then( () => {
-    console.log('fetchFragmentsAndCreateProgram: all fragments fetched');
-    return createProgramFromScripts(gl, ids);
+  const shaderPromises = ids.map( id => {
+    console.log(`fetchFragmentsAndCreateProgram: start: id=${id}`);
+    if (! id.match(/(vertex|fragment)/)) {
+      throw `ERROR: fetchFragmentsAndCreateProgram: id does not mention vertex or fragment: ${id}`;
+    }
+    const filename = `glsl/${id}.glsl`;
+
+    return fetch( filename )
+    .then( response => { return response.text(); })
+    .then( shaderText => {
+      console.log(`fetchFragmentsAndCreateProgram: fetched id=${id}`);
+      const opt_shaderType = (id.match('vertex'))? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER;
+      return compileShader(gl, shaderText, opt_shaderType);
+    })
+    ;
+  });
+
+  return Promise.all( shaderPromises )
+  .then( shaders => {
+    console.log('fetchFragmentsAndCreateProgram: all shaders created');
+    return createProgram(gl, shaders);
   })
   ;
 }
