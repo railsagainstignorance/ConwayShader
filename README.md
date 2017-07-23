@@ -16,7 +16,7 @@ Demo at https://railsagainstignorance.github.io/ConwayShader/.
    * hopefully just my pants local web server
 
 
-## texCoordLocation
+## TODO
 
 * fix global var nastiness in main.js
 * maybe decouple render from requestAnimationFrame
