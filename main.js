@@ -43,20 +43,10 @@ function initGL() {
     gl.disable(gl.DEPTH_TEST);
 
     // fetch all the program fragments,
-    // inject them into script elements with appropriate ids
-    // then look them up using script ids and compile the overall program.
+    // and compile the overall program.
     const fragmentIds = ['2d-vertex-shader', '2d-fragment-shader'];
-    console.log(`initGL: fragmentIds=${fragmentIds}`);
 
-    const fragmentPromises = fragmentIds.map( f => {
-      return fetchGlslFragment( document, f );
-    })
-
-    Promise.all( fragmentPromises )
-    .then( () => {
-      console.log('initGL: all fragments fetched');
-      return createProgramFromScripts(gl, fragmentIds);
-    })
+    fetchFragmentsAndCreateProgram( gl, fragmentIds)
     .then( program => {
       gl.useProgram(program);
 

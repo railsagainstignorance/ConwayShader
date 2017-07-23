@@ -114,7 +114,7 @@ function createProgramFromScripts( gl, ids) {
  * @param {string} id The id of the shader script tag (filename and type are derived from it).
  * @return {!promise} A promise from the fetch
  */
-function fetchGlslFragment(doc, id){
+function fetchGlslFragment( id){
   console.log(`fetchGlslFragment: start: id=${id}`);
   if (! id.match(/(vertex|fragment)/)) {
     throw `ERROR: fetchGlslFragment: id does not mention vertex or fragment: ${id}`;
@@ -130,8 +130,30 @@ function fetchGlslFragment(doc, id){
     script.type      = type;
     script.innerHTML = text;
     script.id        = id;
-    (doc.getElementsByTagName( "head" )[ 0 ]).appendChild( script );
+    (document.getElementsByTagName( "head" )[ 0 ]).appendChild( script );
     console.log(`fetchGlslProgram: injected id=${id}`);
+  })
+  ;
+}
+
+/**
+ * Creates a program from a list of ids.
+ *
+ * @param {!WebGLRenderingContext} gl The WebGL Context.
+ * @param {array} ids The list of shader ids.
+ * @return {!WebGLProgram} A program
+ */
+function fetchFragmentsAndCreateProgram( gl, ids ) {
+  console.log(`fetchFragmentsAndCreateProgram: ids=${ids}`);
+
+  const fragmentPromises = ids.map( id => {
+    return fetchGlslFragment( id );
+  })
+
+  return Promise.all( fragmentPromises )
+  .then( () => {
+    console.log('fetchFragmentsAndCreateProgram: all fragments fetched');
+    return createProgramFromScripts(gl, ids);
   })
   ;
 }
