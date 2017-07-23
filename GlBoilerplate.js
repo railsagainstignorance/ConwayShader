@@ -112,8 +112,12 @@ function createProgramFromScripts(
 
 function fetchGlslFragment(doc, id){
   console.log(`fetchGlslFragment: start: id=${id}`);
+  if (! id.match(/(vertex|fragment)/)) {
+    throw "fetchGlslFragment: id does not mention vertex or fragment: ${id}";
+  }
   var type = (id.match('vertex'))? 'x-shader/x-vertex' : 'x-shader/x-fragment';
   const filename = `glsl/${id}.glsl`;
+  
   return fetch( filename )
   .then( response => { return response.text(); })
   .then( text => {
