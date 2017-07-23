@@ -144,36 +144,48 @@ function makeTexture(gl){
     return texture;
 }
 
+var countUnpausedRenders = 0;
+var startUnpausedRendersMillis;
+
 function render(){
 
-    if (!paused) {
+    if (paused) {
+      countUnpausedRenders = 0;
+    } else {
+      if (countUnpausedRenders == 0) {
+        startUnpausedRendersMillis = performance.now();
+      }
+      if (resizedLastState) {
+          lastState = resizedLastState;
+          resizedLastState = null;
+      }
+      if (resizedCurrentState) {
+          currentState = resizedCurrentState;
+          resizedCurrentState = null;
+      }
 
-        if (resizedLastState) {
-            lastState = resizedLastState;
-            resizedLastState = null;
-        }
-        if (resizedCurrentState) {
-            currentState = resizedCurrentState;
-            resizedCurrentState = null;
-        }
+      // don't y flip images while drawing to the textures
+      gl.uniform1f(flipYLocation, 1);
 
-        // don't y flip images while drawing to the textures
-        gl.uniform1f(flipYLocation, 1);
+      step();
 
-        step();
+      gl.uniform1f(flipYLocation, -1);  // need to y flip for canvas
+      gl.bindTexture(gl.TEXTURE_2D, lastState);
 
+      //draw to canvas
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindTexture(gl.TEXTURE_2D, lastState);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        gl.uniform1f(flipYLocation, -1);  // need to y flip for canvas
-        gl.bindTexture(gl.TEXTURE_2D, lastState);
-
-
-        //draw to canvas
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.bindTexture(gl.TEXTURE_2D, lastState);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      countUnpausedRenders++;
+      if (countUnpausedRenders % 100 == 0) {
+        const nowMillis = performance.now();
+        const elapsedMillis = nowMillis - startUnpausedRendersMillis;
+        const frameRatePerSec = 1000 * countUnpausedRenders / elapsedMillis ;
+        const millisPerFrame = elapsedMillis / countUnpausedRenders;
+        console.log(`render: frameRatePerSec=${frameRatePerSec}`);
+      }
     }
-
-
 
     window.requestAnimationFrame(render);
 }
