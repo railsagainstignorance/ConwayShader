@@ -42,64 +42,80 @@ function initGL() {
 
     gl.disable(gl.DEPTH_TEST);
 
-    // setup a GLSL program
-    var program = createProgramFromScripts(gl, "2d-vertex-shader", "2d-fragment-shader");
-    gl.useProgram(program);
+    // fetch all the program fragments,
+    // inject them into script elements with appropriate ids
+    // then look them up using script ids and compile the overall program.
+    const fragmentIds = ['2d-vertex-shader', '2d-fragment-shader'];
+    console.log(`initGL: fragmentIds=${fragmentIds}`);
 
-    // look up where the vertex data needs to go.
-    var positionLocation = gl.getAttribLocation(program, "a_position");
+    const fragmentPromises = fragmentIds.map( f => {
+      return fetchGlslFragment( document, f );
+    })
 
-    // Create a buffer for positions
-    var bufferPos = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, bufferPos);
-    gl.enableVertexAttribArray(positionLocation);
-    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+    Promise.all( fragmentPromises )
+    .then( () => {
+      console.log('initGL: all fragments fetched');
+      return createProgramFromScripts(gl, fragmentIds);
+    })
+    .then( program => {
+      gl.useProgram(program);
 
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        -1.0, -1.0,
-        1.0, -1.0,
-        -1.0, 1.0,
-        -1.0, 1.0,
-        1.0, -1.0,
-        1.0, 1.0]), gl.STATIC_DRAW);
+      // look up where the vertex data needs to go.
+      var positionLocation = gl.getAttribLocation(program, "a_position");
 
+      // Create a buffer for positions
+      var bufferPos = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufferPos);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-    //flip y
-    flipYLocation = gl.getUniformLocation(program, "u_flipY");
-
-    //set texture location
-    var texCoordLocation = gl.getAttribLocation(program, "a_texCoord");
-
-    textureSizeLocation = gl.getUniformLocation(program, "u_textureSize");
-
-    mouseCoordLocation = gl.getUniformLocation(program, "u_mouseCoord");
-
-    // provide texture coordinates for the rectangle.
-    var texCoordBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        0.0, 0.0,
-        1.0, 0.0,
-        0.0, 1.0,
-        0.0, 1.0,
-        1.0, 0.0,
-        1.0, 1.0]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(texCoordLocation);
-    gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+          -1.0, -1.0,
+          1.0, -1.0,
+          -1.0, 1.0,
+          -1.0, 1.0,
+          1.0, -1.0,
+          1.0, 1.0]), gl.STATIC_DRAW);
 
 
-    onResize();
+      //flip y
+      flipYLocation = gl.getUniformLocation(program, "u_flipY");
 
-    lastState = resizedLastState;
-    currentState = resizedCurrentState;
-    resizedLastState = null;
-    resizedCurrentState = null;
+      //set texture location
+      var texCoordLocation = gl.getAttribLocation(program, "a_texCoord");
 
-    frameBuffer = gl.createFramebuffer();
+      textureSizeLocation = gl.getUniformLocation(program, "u_textureSize");
 
-    gl.bindTexture(gl.TEXTURE_2D, lastState);//original texture
+      mouseCoordLocation = gl.getUniformLocation(program, "u_mouseCoord");
 
-    render();
+      // provide texture coordinates for the rectangle.
+      var texCoordBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+          0.0, 0.0,
+          1.0, 0.0,
+          0.0, 1.0,
+          0.0, 1.0,
+          1.0, 0.0,
+          1.0, 1.0]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(texCoordLocation);
+      gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+
+      onResize();
+
+      lastState = resizedLastState;
+      currentState = resizedCurrentState;
+      resizedLastState = null;
+      resizedCurrentState = null;
+
+      frameBuffer = gl.createFramebuffer();
+
+      gl.bindTexture(gl.TEXTURE_2D, lastState);//original texture
+
+      render();
+    })
+    ;
 }
 
 function makeRandomArray(rgba){
@@ -128,36 +144,48 @@ function makeTexture(gl){
     return texture;
 }
 
+var countUnpausedRenders = 0;
+var startUnpausedRendersMillis;
+
 function render(){
 
-    if (!paused) {
+    if (paused) {
+      countUnpausedRenders = 0;
+    } else {
+      if (countUnpausedRenders == 0) {
+        startUnpausedRendersMillis = performance.now();
+      }
+      if (resizedLastState) {
+          lastState = resizedLastState;
+          resizedLastState = null;
+      }
+      if (resizedCurrentState) {
+          currentState = resizedCurrentState;
+          resizedCurrentState = null;
+      }
 
-        if (resizedLastState) {
-            lastState = resizedLastState;
-            resizedLastState = null;
-        }
-        if (resizedCurrentState) {
-            currentState = resizedCurrentState;
-            resizedCurrentState = null;
-        }
+      // don't y flip images while drawing to the textures
+      gl.uniform1f(flipYLocation, 1);
 
-        // don't y flip images while drawing to the textures
-        gl.uniform1f(flipYLocation, 1);
+      step();
 
-        step();
+      gl.uniform1f(flipYLocation, -1);  // need to y flip for canvas
+      gl.bindTexture(gl.TEXTURE_2D, lastState);
 
+      //draw to canvas
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindTexture(gl.TEXTURE_2D, lastState);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        gl.uniform1f(flipYLocation, -1);  // need to y flip for canvas
-        gl.bindTexture(gl.TEXTURE_2D, lastState);
-
-
-        //draw to canvas
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.bindTexture(gl.TEXTURE_2D, lastState);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      countUnpausedRenders++;
+      if (countUnpausedRenders % 100 == 0) {
+        const nowMillis = performance.now();
+        const elapsedMillis = nowMillis - startUnpausedRendersMillis;
+        const frameRatePerSec = 1000 * countUnpausedRenders / elapsedMillis ;
+        const millisPerFrame = elapsedMillis / countUnpausedRenders;
+        console.log(`render: frameRatePerSec=${frameRatePerSec}`);
+      }
     }
-
-
 
     window.requestAnimationFrame(render);
 }
